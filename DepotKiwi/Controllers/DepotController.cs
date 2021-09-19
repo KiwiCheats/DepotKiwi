@@ -2,16 +2,14 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
-using System.Xml.Linq;
+
 using DepotKiwi.Db;
 using DepotKiwi.RequestModels;
 using DepotKiwi.Services;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DepotKiwi.Controllers {
@@ -71,7 +69,7 @@ namespace DepotKiwi.Controllers {
         [AllowAnonymous]
         [HttpGet("info/{depotId}")]
         public async Task<DepotInfoResponse> Info(string depotId) {
-            var depot = await _databaseContext.Depots.Get(depotId);
+            var depot = await _databaseContext.Depots.Get(depotId) ?? await _databaseContext.Depots.GetByName(depotId);
 
             return new() {
                 Success = depot is not null,
@@ -81,10 +79,22 @@ namespace DepotKiwi.Controllers {
 
         [AllowAnonymous]
         [HttpGet("file/download/{depotId}/{**file}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Download(string depotId, string file) {
-            var repository = _repositoryService.GetRepositoryStorageService(depotId) ?? _repositoryService.CreateRepositoryStorageService(depotId);
+            var repository = _repositoryService.GetRepositoryStorageService(depotId);
+
+            if (repository is null) {
+                var depot = await _databaseContext.Depots.GetByName(depotId);
+
+                if (depot is not null)
+                    repository = _repositoryService.GetRepositoryStorageService(depot.Id) ?? _repositoryService.CreateRepositoryStorageService(depot.Id);
+            }
+
+            if (repository is null) {
+                return new StatusActionResult(new StatusResponse {
+                    Success = false,
+                    Message = "Depot is invalid."
+                }, 404);
+            }
 
             var stream = repository.GetFileStream(file);
 
@@ -102,7 +112,7 @@ namespace DepotKiwi.Controllers {
         [AllowAnonymous]
         [HttpPost("file/upload/{depotId}/{**file}")]
         public async Task<StatusResponse> Upload(string depotId, string file, [FromBody] DepotFileUploadRequest request) {
-            var depot = await _databaseContext.Depots.Get(depotId);
+            var depot = await _databaseContext.Depots.Get(depotId) ?? await _databaseContext.Depots.GetByName(depotId);
 
             if (depot is null) {
                 return new() {
@@ -161,7 +171,7 @@ namespace DepotKiwi.Controllers {
         [AllowAnonymous]
         [HttpPost("file/delete/{depotId}/{**file}")]
         public async Task<StatusResponse> Delete(string depotId, string file) {
-            var depot = await _databaseContext.Depots.Get(depotId);
+            var depot = await _databaseContext.Depots.Get(depotId) ?? await _databaseContext.Depots.GetByName(depotId);
 
             if (depot is null) {
                 return new() {
@@ -186,7 +196,7 @@ namespace DepotKiwi.Controllers {
                 };
             }
 
-            var repository = _repositoryService.GetRepositoryStorageService(depotId) ?? _repositoryService.CreateRepositoryStorageService(depotId);
+            var repository = _repositoryService.GetRepositoryStorageService(depot.Id) ?? _repositoryService.CreateRepositoryStorageService(depot.Id);
 
             repository.DeleteFile(file);
 

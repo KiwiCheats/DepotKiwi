@@ -25,6 +25,17 @@ namespace DepotKiwi.Db {
                 return null;
             }
         }
+        
+        public async Task<Depot> GetByName(string name) {
+            try {
+                return await _context.DepotCollection
+                    .Find(depot => depot.Name == name)
+                    .FirstOrDefaultAsync();
+            }
+            catch (FormatException) {
+                return null;
+            }
+        }
 
         public Depot Create(Depot item) {
             _context.DepotCollection.InsertOne(item);
