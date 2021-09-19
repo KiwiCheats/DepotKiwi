@@ -16,9 +16,9 @@ namespace DepotKiwi.Controllers {
     [ApiController]
     [Route("[controller]")]
     public class DepotController {
-        public DepotController(DatabaseContext databaseContext) {
+        public DepotController(DatabaseContext databaseContext, RepositoryService repositoryService) {
             _databaseContext = databaseContext;
-            _repositoryService = new(Path.Join(AppContext.BaseDirectory, "storage"));
+            _repositoryService = repositoryService;
         }
         
         [AllowAnonymous]
